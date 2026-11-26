@@ -1,4 +1,13 @@
-import { collection, STORAGE_PREFIX } from "./storage";
+import { SupabaseCollection } from "./supabase/collection";
+import {
+  customerMapper,
+  importJobMapper,
+  productScoreMapper,
+  projectMapper,
+  propertyMapper,
+  swotMapper,
+  uspMapper,
+} from "./supabase/mappers";
 import type {
   Customer,
   ImportJob,
@@ -11,25 +20,21 @@ import type {
 } from "./types";
 import { DEFAULT_SCORING_WEIGHTS } from "./types";
 
-export const COLLECTION_NAMES = [
-  "projects",
-  "properties",
-  "customers",
-  "scores",
-  "swot",
-  "usp",
-  "import_jobs",
-] as const;
+// Every collection below reads/writes the agent's real Supabase database,
+// scoped by Row Level Security to the signed-in user (see supabase/schema.sql).
+// See src/lib/supabase/collection.ts for how the cache + realtime sync works.
 
-export const projectsCol = collection<Project>("projects");
-export const propertiesCol = collection<Property>("properties");
-export const customersCol = collection<Customer>("customers");
-export const scoresCol = collection<ProductScore & { id: string }>("scores");
-export const swotCol = collection<SwotAnalysis & { id: string }>("swot");
-export const uspCol = collection<ProductUsp & { id: string }>("usp");
-export const importJobsCol = collection<ImportJob>("import_jobs");
+export const projectsCol = new SupabaseCollection<Project>(projectMapper);
+export const propertiesCol = new SupabaseCollection<Property>(propertyMapper);
+export const customersCol = new SupabaseCollection<Customer>(customerMapper);
+export const scoresCol = new SupabaseCollection<ProductScore & { id: string }>(productScoreMapper);
+export const swotCol = new SupabaseCollection<SwotAnalysis & { id: string }>(swotMapper);
+export const uspCol = new SupabaseCollection<ProductUsp & { id: string }>(uspMapper);
+export const importJobsCol = new SupabaseCollection<ImportJob>(importJobMapper);
 
-const WEIGHTS_KEY = `${STORAGE_PREFIX}scoring_weights`;
+// Scoring weights are a personal preference, not business data — kept in
+// localStorage rather than adding a settings table.
+const WEIGHTS_KEY = "realty360:scoring_weights";
 
 export function getScoringWeights(): ScoringWeights {
   if (typeof window === "undefined") return DEFAULT_SCORING_WEIGHTS;
@@ -57,11 +62,4 @@ export function getSwot(propertyId: string): (SwotAnalysis & { id: string }) | u
 
 export function getUsp(propertyId: string): (ProductUsp & { id: string }) | undefined {
   return uspCol.getById(propertyId);
-}
-
-export function isDemoDataActive(): boolean {
-  return (
-    projectsCol.getAll().some((p) => p.isDemo) ||
-    propertiesCol.getAll().some((p) => p.isDemo)
-  );
 }

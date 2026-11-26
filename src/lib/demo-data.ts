@@ -195,7 +195,7 @@ function randomName() {
   return `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
 }
 
-export function seedDemoData() {
+export async function seedDemoData() {
   if (projectsCol.getAll().some((p) => p.isDemo)) return; // already seeded
 
   const now = new Date().toISOString();
@@ -209,7 +209,7 @@ export function seedDemoData() {
     updatedAt: now,
     isDemo: true,
   }));
-  projectsCol.upsertMany(projects);
+  await projectsCol.upsertMany(projects);
 
   const properties: Property[] = [];
   const scores: (ProductScore & { id: string })[] = [];
@@ -333,10 +333,8 @@ export function seedDemoData() {
     }
   });
 
-  propertiesCol.upsertMany(properties);
-  scoresCol.upsertMany(scores);
-  swotCol.upsertMany(swots);
-  uspCol.upsertMany(usps);
+  await propertiesCol.upsertMany(properties);
+  await Promise.all([scoresCol.upsertMany(scores), swotCol.upsertMany(swots), uspCol.upsertMany(usps)]);
 
   const purposes: Customer["purpose"][] = [
     "mua_de_o",
@@ -387,11 +385,17 @@ export function seedDemoData() {
 }
 
 export function clearDemoData() {
-  propertiesCol.replaceAll(propertiesCol.getAll().filter((p) => !p.isDemo));
-  projectsCol.replaceAll(projectsCol.getAll().filter((p) => !p.isDemo));
-  customersCol.replaceAll(customersCol.getAll().filter((c) => !c.isDemo));
-  const remainingIds = new Set(propertiesCol.getAll().map((p) => p.id));
-  scoresCol.replaceAll(scoresCol.getAll().filter((s) => remainingIds.has(s.propertyId)));
-  swotCol.replaceAll(swotCol.getAll().filter((s) => remainingIds.has(s.propertyId)));
-  uspCol.replaceAll(uspCol.getAll().filter((s) => remainingIds.has(s.propertyId)));
+  const demoPropertyIds = propertiesCol.getAll().filter((p) => p.isDemo).map((p) => p.id);
+  for (const id of demoPropertyIds) {
+    scoresCol.remove(id);
+    swotCol.remove(id);
+    uspCol.remove(id);
+    propertiesCol.remove(id);
+  }
+  for (const p of projectsCol.getAll().filter((p) => p.isDemo)) {
+    projectsCol.remove(p.id);
+  }
+  for (const c of customersCol.getAll().filter((c) => c.isDemo)) {
+    customersCol.remove(c.id);
+  }
 }

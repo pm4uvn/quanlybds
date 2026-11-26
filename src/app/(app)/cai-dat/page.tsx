@@ -9,9 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { setScoringWeights } from "@/lib/repo";
 import { useProjects, useProperties, useScoringWeights } from "@/lib/use-repo";
 import { SCORE_CRITERIA } from "@/lib/scoring";
-import { clearDemoData } from "@/lib/demo-data";
+import { clearDemoData, seedDemoData } from "@/lib/demo-data";
 import { DEFAULT_SCORING_WEIGHTS, type ScoringWeights } from "@/lib/types";
 import { toast } from "sonner";
+import { useSession } from "@/lib/supabase/use-session";
+import { signOut } from "@/lib/supabase/session-store";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +34,7 @@ export default function SettingsPage() {
   const projects = useProjects();
   const properties = useProperties();
   const demoActive = projects.some((p) => p.isDemo) || properties.some((p) => p.isDemo);
+  const { session } = useSession();
 
   function save() {
     setScoringWeights(weights);
@@ -87,13 +91,24 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Realty360 đi kèm dữ liệu minh họa (dự án, sản phẩm, khách hàng giả định) để bạn trải nghiệm trước.
-            Khi đã sẵn sàng quản lý dữ liệu thật, bạn có thể xoá toàn bộ dữ liệu demo.
+            Dữ liệu của bạn đọc/ghi trực tiếp vào cơ sở dữ liệu Supabase — không còn tự tạo dữ liệu minh họa khi
+            mở ứng dụng. Bạn có thể tự tạo một bộ dữ liệu mẫu (gắn nhãn demo) để thử các tính năng, và xoá nó bất
+            cứ lúc nào mà không ảnh hưởng dữ liệu thật đã nhập.
           </p>
           <Badge variant={demoActive ? "outline" : "secondary"}>
-            {demoActive ? "Dữ liệu demo đang hoạt động" : "Không còn dữ liệu demo"}
+            {demoActive ? "Có dữ liệu demo trong cơ sở dữ liệu" : "Không có dữ liệu demo"}
           </Badge>
-          <div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              disabled={demoActive}
+              onClick={async () => {
+                await seedDemoData();
+                toast.success("Đã tạo dữ liệu demo trong Supabase");
+              }}
+            >
+              Tạo dữ liệu demo
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" disabled={!demoActive}>
@@ -104,8 +119,8 @@ export default function SettingsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Xoá toàn bộ dữ liệu demo?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Hành động này sẽ xoá các dự án, sản phẩm và khách hàng được gắn nhãn minh hoạ. Dữ liệu thật bạn
-                    đã tự nhập sẽ không bị ảnh hưởng. Không thể hoàn tác.
+                    Hành động này sẽ xoá các dự án, sản phẩm và khách hàng được gắn nhãn minh hoạ khỏi cơ sở dữ
+                    liệu. Dữ liệu thật bạn đã tự nhập sẽ không bị ảnh hưởng. Không thể hoàn tác.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -124,6 +139,22 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {isSupabaseConfigured && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Tài khoản</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Đang đăng nhập với <span className="font-medium text-foreground">{session?.user.email}</span>.
+            </p>
+            <Button variant="outline" onClick={() => signOut()}>
+              Đăng xuất
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
